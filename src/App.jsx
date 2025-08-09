@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import "./App.css";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 
 function App() {
@@ -9,107 +8,140 @@ function App() {
   let [imgURL, setImgURL] = useState("");
   let [weatherData, setWeatherData] = useState(null);
   let [dataError, setDataError] = useState(false);
+  const inputRef = useRef(null);
 
   useEffect(() => {
+    // autofocus input on mount
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!active) return; // only fetch if active triggered
     setLoading(true);
     let apiURL = `https://api.openweathermap.org/data/2.5/weather?q=${cityName}&appid=2a1f42ab95bf5a4ae08ebfe370c3afa4&units=metric`;
 
     axios
       .get(apiURL)
       .then((res) => {
-        if (res.statusText === "OK") {
-          console.log(res.data);
+        if (res.status === 200) {
           setDataError(false);
           setWeatherData({ ...res.data });
           setImgURL(
             `https://openweathermap.org/img/wn/${res.data.weather[0].icon}@2x.png`
           );
+        } else {
+          setDataError(true);
+          setWeatherData(null);
         }
       })
       .catch(() => {
-        console.log("Error");
         setDataError(true);
+        setWeatherData(null);
       })
       .finally(() => {
         setLoading(false);
         setActive(false);
       });
-  }, [active]);
+  }, [active, cityName]);
 
   function handleCityChange(e) {
     setCityName(e.target.value);
   }
+
   function handleCitySet() {
+    if (cityName.trim() === "") {
+      setDataError(true);
+      setWeatherData(null);
+      return;
+    }
     setActive(true);
   }
-  return (
-    <div
-      className={`flex flex-col items-center gap-3 w-screen h-screen bg-blue-200`}
-    >
-      <div className="text-3xl font-bold text-center text-gray-600 bg-opacity-60 bg-white p-6 rounded-lg drop-shadow-md z-1 w-2/5 mt-10">
-        <h1>Weather Forecast</h1>
-      </div>
 
-      <div className=" text-lg rounded-xl drop-shadow-lg bg-opacity-60 bg-white p-6 text-gray-600 w-2/5">
-        <div className="flex flex-row justify-center items-center gap-2 mb-1 drop-shadow-sm">
-          <label htmlFor="city__field">Place Name: </label>
+  function handleKeyPress(e) {
+    if (e.key === "Enter") {
+      handleCitySet();
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-300 to-blue-600 flex flex-col items-center justify-start p-4 sm:p-8">
+      <header className="text-white text-4xl font-extrabold mb-8 drop-shadow-lg text-center">
+        Weather Forecast
+      </header>
+
+      <div className="bg-white bg-opacity-90 rounded-xl shadow-lg p-6 w-full max-w-md">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 mb-6">
+          <label
+            htmlFor="city__field"
+            className="text-gray-700 font-semibold mb-1 sm:mb-0"
+          >
+            Place Name:
+          </label>
           <input
             id="city__field"
-            className="rounded-md bg-gray-100 p-2"
+            ref={inputRef}
+            className="flex-grow rounded-md border border-gray-300 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             type="text"
             value={cityName}
-            onChange={(e) => handleCityChange(e)}
+            onChange={handleCityChange}
+            onKeyDown={handleKeyPress}
+            placeholder="Enter city name"
+            aria-label="City name input"
           />
           <button
-            className="rounded-md bg-gray-500 p-2 text-white drop-shadow-lg"
+            className={`mt-3 sm:mt-0 bg-blue-600 text-white rounded-md px-5 py-2 font-semibold hover:bg-blue-700 transition disabled:bg-blue-300 disabled:cursor-not-allowed`}
             onClick={handleCitySet}
+            disabled={loading}
+            aria-label="Fetch weather"
           >
-            OK
+            {loading ? "Loading..." : "Get Weather"}
           </button>
         </div>
-        {loading ? (
-          "Loading..."
-        ) : weatherData ? (
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex flex-col align-middle justify-center gap-1">
-              <img
-                className="drop-shadow-lg"
-                src={imgURL}
-                alt="Weather Image"
-              />
-              <p className="text-gray-600 text-center drop-shadow-lg">
-                {weatherData.weather[0].main} Sky
+
+        {dataError && (
+          <div className="text-red-600 text-center font-semibold mb-4">
+            No Data Found. Please check the city name.
+          </div>
+        )}
+
+        {weatherData && !loading && (
+          <div className="flex flex-col items-center gap-4">
+            <img
+              className="drop-shadow-lg"
+              src={imgURL}
+              alt={weatherData.weather[0].description || "Weather Icon"}
+              width={120}
+              height={120}
+            />
+            <p className="text-lg font-semibold text-gray-700 capitalize drop-shadow-sm">
+              {weatherData.weather[0].main} Sky
+            </p>
+
+            <div className="w-full bg-blue-50 rounded-lg p-4 shadow-inner">
+              <p className="flex justify-between text-gray-800 mb-1">
+                <span>Temperature:</span>{" "}
+                <span className="font-bold">{weatherData.main.temp} °C</span>
+              </p>
+              <p className="flex justify-between text-gray-800 mb-1">
+                <span>Wind Speed:</span>{" "}
+                <span className="font-bold">{weatherData.wind.speed} km/h</span>
+              </p>
+              <p className="flex justify-between text-gray-800">
+                <span>Humidity:</span>{" "}
+                <span className="font-bold">{weatherData.main.humidity} %</span>
               </p>
             </div>
-            <div className="w-3/5 m-auto drop-shadow-lg">
-              <p className="flex justify-between">
-                <b>Temperature: </b>
-                {weatherData.main.temp} °C
-              </p>
-              <p className="flex justify-between">
-                <b>Wind Speed: </b>
-                {weatherData.wind.speed} km/h
-              </p>
-              <p className="flex justify-between">
-                <b>Humidity: </b>
-                {weatherData.main.humidity} %
-              </p>
-            </div>
-            <h2 className="text-3xl font-bold text-center drop-shadow-lg">
+
+            <h2 className="text-3xl font-bold text-gray-800 drop-shadow-md mt-3">
               {weatherData.name}
             </h2>
           </div>
-        ) : (
-          "No Data"
+        )}
+
+        {!weatherData && !loading && !dataError && (
+          <p className="text-center text-gray-500">Enter a city to get started.</p>
         )}
       </div>
-      {dataError ? (
-        <div className="error__msg text-lg text-center rounded-lg drop-shadow-lg bg-opacity-60 bg-white p-3 text-red-600 w-2/5">
-          No Data Found
-        </div>
-      ) : (
-        ""
-      )}
     </div>
   );
 }
